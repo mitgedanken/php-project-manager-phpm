@@ -1,0 +1,12 @@
+{
+    "require": {
+        "php": ">=7.3",
+        "guzzlehttp/guzzle": "^6.5",
+        "symfony/console": "^5.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "PHPM\\": "src/"
+        }
+    }
+}
