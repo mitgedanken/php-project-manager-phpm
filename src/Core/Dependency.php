@@ -18,53 +18,35 @@ class Dependency
 
     public function resolve(): array
     {
-        $responses = \GuzzleHttp\Promise\all($this->fetch())
-            ->wait();
+        $items = $this->composer
+            ->getDispatcher()
+            ->getItems();
 
-        var_dump($this->composer->getDispatcher()->getItems());
-        return [];
+        // Wait for promises.
+        \GuzzleHttp\Promise\all(
+            array_map(
+                static function (Package $item) {
+                    return $item->fetchDependencies();
+                },
+                $items,
+            )
+        )->wait();
+
+        return array_reduce(
+            $items,
+            static function (array $carry, Package $item) {
+                [$name, $version] = explode(
+                    ':',
+                    (string) $item,
+                );
+                if (in_array($name, $carry, true)) {
+                    return $carry;
+                }
+                $carry[] = $name;
+                return $carry;
+            },
+            [],
+        );
     }
 
-    public function fetch()
-    {
-        $promises = [];
-        foreach ($this->composer->getRequires() as $package) {
-            /**
-             * @var Promise $promise
-             */
-            $promise = $package->fetchDependencies()
-                ->current();
-
-            if ($promise === null) {
-                continue;
-            }
-
-            $promises[] = $promise->then(function(Response $onFulfilled) use ($package) {
-                $jsonData = json_decode(
-                    (string) $onFulfilled->getBody(),
-                    true
-                );
-
-                $selectedVersion = array_filter($jsonData['package']['versions'] ?? [], function ($detail, $key) use ($package) {
-                    return !!preg_match('/' . $package->getRequireVersion() . '/', $key);
-                }, ARRAY_FILTER_USE_BOTH);
-
-                $selectedVersion = current($selectedVersion);
-
-                $this->composer->getDispatcher()->dispatch(
-                    new Composer(
-                        $selectedVersion,
-                        $this->composer->getDispatcher(),
-                        $this->composer->getInput(),
-                        $this->composer->getOutput(),
-                        $this->composer,
-                    )
-                );
-
-            });
-            $package->fetchDependencies()
-                ->next();
-        }
-        return $promises;
-    }
 }

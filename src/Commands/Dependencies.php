@@ -27,8 +27,18 @@ class Dependencies extends Command
             $output
         );
 
-        (new Dependency($composer))
-            ->resolve();
+        $composer->wait();
+//
+//        $dependencyPackages = (new Dependency($composer))
+//            ->resolve();
+//
+//        foreach ($dependencyPackages as $dependencyPackage) {
+//            $composer->getOutput()
+//                ->writeln(
+//                    $dependencyPackage,
+//                    OutputInterface::OUTPUT_NORMAL
+//                );
+//        }
 
         return 0;
     }
