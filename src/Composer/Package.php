@@ -4,6 +4,7 @@ namespace PHPM\Composer;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Promise\Promise;
+use GuzzleHttp\Psr7\Response;
 
 class Package
 {
@@ -13,6 +14,7 @@ class Package
     protected $dependencies = [];
     protected $guzzleClient;
     protected $composer;
+    protected $promise;
 
     public function __construct(Composer $composer, string $vendorName, string $extensionName, string $requireVersion = '*')
     {
@@ -20,6 +22,19 @@ class Package
         $this->vendorName = $vendorName;
         $this->extensionName = $extensionName;
         $this->requireVersion = $requireVersion;
+
+        $this->guzzleClient = new Client(
+            [
+                'base_uri' => $this->composer->getInput()->getOption(
+                    'repository'
+                ),
+            ]
+        );
+    }
+
+    public function __toString(): string
+    {
+        return $this->vendorName . '/' . $this->extensionName . ':' . $this->requireVersion;
     }
 
     public function getVendorName(): string
@@ -57,27 +72,32 @@ class Package
 
     public function fetchDependencies()
     {
-        $client = $this->guzzleClient ?? new Client(
-            [
-                'base_uri' => $this->composer->getInput()->getOption(
-                    'repository'
-                ),
-            ]
-        );
-
-        $package = $client->requestAsync(
-            'GET',
-            sprintf(
-                '/packages/%s.json',
-                $this->vendorName . '/' . $this->extensionName
+        return $this->promise = $this->promise ?? $this->guzzleClient
+            ->requestAsync(
+                'GET',
+                sprintf(
+                    '/packages/%s/%s.json',
+                    $this->vendorName,
+                    $this->extensionName,
+                )
             )
-        );
+            ->then(function (Response $response) {
+                $json = json_decode(
+                    (string) $response->getBody(),
+                    true
+                );
 
-        yield $package;
-
-        $promises = [];
-
-        yield $promises;
-
+                $composers = [];
+                $versions = $json['package']['versions'];
+                foreach ($versions as $version => $details) {
+                    $composers[$version] = new Composer(
+                        $details,
+                        $this->composer->getDispatcher(),
+                        $this->composer->getInput(),
+                        $this->composer->getOutput(),
+                        $this->composer
+                    );
+                }
+            });
     }
 }

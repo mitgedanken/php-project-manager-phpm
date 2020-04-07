@@ -24,14 +24,49 @@ class Composer
         $this->parentComposer = $parentComposer;
         foreach ($json['require'] ?? [] as $extension => $requireVersion) {
             if (preg_match('/\A([^\/]+)\/(.+)\z/', $extension, $matches)) {
-                $this->requires[] = new Package(
+                $package = new Package(
                     $this,
                     $matches[1],
                     $matches[2],
                     $requireVersion
                 );
+                if ($this->getDispatcher()
+                    ->findBy(
+                        $package,
+                        static function (Package $a, Package $b) {
+                            return (string) $a === (string) $b;
+                        }
+                    )
+                ) {
+                    continue;
+                }
+
+                $this->requires[] = $package;
+
+                $this->getDispatcher()
+                    ->dispatch($package);
+
+                $this->getOutput()
+                    ->writeln(
+                        "Load a package speculation: " . $package,
+                    );
+
+                $package->fetchDependencies();
             }
         }
+    }
+
+    public function wait(): self
+    {
+        \GuzzleHttp\Promise\all(
+            array_map(
+                static function (Package $item) {
+                    return $item->fetchDependencies();
+                },
+                $this->getDispatcher()->getItems(),
+            )
+        )->wait();
+        return $this;
     }
 
     public static function factory(string $path, InputInterface $input, OutputInterface $output): self

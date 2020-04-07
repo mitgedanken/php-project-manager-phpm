@@ -18,4 +18,14 @@ class Dispatcher
     {
         return $this->items;
     }
+
+    public function findBy($from, callable $compareFunction): bool
+    {
+        foreach ($this->items as $item) {
+            if ($compareFunction($item, $from)) {
+                return true;
+            }
+        }
+        return false;
+    }
 }
