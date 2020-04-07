@@ -42,5 +42,4 @@ class Dependencies extends Command
 
         return 0;
     }
-
 }
